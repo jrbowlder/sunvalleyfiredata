@@ -1,13 +1,13 @@
-# SVFD Capstone — data schema
+# SVFD Capstone data schema
 
 Working draft. Grain, keys, sources and known defects for the warehouse behind the
 capstone project. Nothing here is final until the source quirks are locked down.
 
 ## The thesis
 
-The department cannot answer basic operational questions — call volume by station at
+The department cannot answer basic operational questions (call volume by station at
 an arbitrary time scale, medic coverage days, whether response performance changed as
-demand grew — because **every identifier in the source systems has two to five
+demand grew) because **every identifier in the source systems has two to five
 spellings, and the two systems each hold only half the answer.**
 
 - Elite knows what happened (incidents, unit times) and not who was available.
@@ -29,9 +29,9 @@ The warehouse resolves identity first, then measures.
 Raw files stay immutable under `data/raw/`. Everything downstream is generated.
 
 **Deliberately excluded:** First Due incident/unit-hour reports (the module is
-essentially unpopulated — 7 rows for 2026, 0 for 2025 and 2021-2024), First Due time
+essentially unpopulated: 7 rows for 2026, 0 for 2025 and 2021-2024), First Due time
 clock (not used; payroll lives elsewhere), and EPCR/patient data (out of scope by
-policy — nothing patient-level leaves the department).
+policy: nothing patient-level leaves the department).
 
 ## Grain
 
@@ -48,11 +48,11 @@ query time from stored timestamps, never stored as typed values.
 
 ## Dimensions
 
-- `dim_date` — calendar, plus a shift column (A/B/C) once the shift rotation is mapped.
-- `dim_station` — canonical `ELK` / `GH` / `GB`. Never `Station 2` / `Station 3`.
-- `dim_apparatus` — canonical rig codes. **Unresolved:** `E60` vs `ENG60`, `E64` vs
+- `dim_date`: calendar, plus a shift column (A/B/C) once the shift rotation is mapped.
+- `dim_station`: canonical `ELK` / `GH` / `GB`. Never `Station 2` / `Station 3`.
+- `dim_apparatus`: canonical rig codes. **Unresolved:** `E60` vs `ENG60`, `E64` vs
   `ENG64`, `S1` all appear in the source; the same rig carries multiple spellings.
-- `dim_incident_type` — NFIRS code plus a two-level taxonomy defined in
+- `dim_incident_type`: NFIRS code plus a two-level taxonomy defined in
   `etl/taxonomy.py`: `family` (Fire, Wildland, EMS, Motor vehicle accident, Backcountry
   rescue, Service, Untyped) and `subtype` (the drill-down the crews actually use). Fire
   drills into Structure fire / Vehicle fire / Alarms / HazMat / Other fire; MVA into With
@@ -68,21 +68,21 @@ query time from stored timestamps, never stored as typed values.
   way; and mutual aid was a *class*, when 382 of the 405 rows in it were there because
   mutual aid was given rather than because of the call type. **Mutual aid is a flag**
   (`fact_incident.mutual_aid_given`), never a family.
-- `dim_person` — department personnel, keyed on name then reconciled to email.
-- `dim_qualification` — qualifier and rank (position-level).
-- `dim_certification` — **temporal** credential record per person: certification name,
+- `dim_person`: department personnel, keyed on name then reconciled to email.
+- `dim_qualification`: qualifier and rank (position-level).
+- `dim_certification`: **temporal** credential record per person: certification name,
   `issue_date`, `expiration_date`. This is the source of truth for clinical status.
 
 ### Paramedic status: a curated dimension, with provenance
 
 Neither First Due source is sufficient on its own:
 
-- **Groups** (`Medic`/`MEDIC`) are the operational truth — reviewed against the roster by
-  Jimmy, 9 members — but they carry only *current* membership. Applied backwards it
+- **Groups** (`Medic`/`MEDIC`) are the operational truth, reviewed against the roster by
+  Jimmy (9 members), but they carry only *current* membership. Applied backwards it
   overstates Elkhorn paramedic days by 110 (638 vs 528).
 - **Certifications** are auditable but **incomplete**: 4 of the 9 group medics have no
   paramedic credential on file (Hannah Baybutt, Julie Youngblood, Nadav Cohen, Zack
-  Traylor — three of the four are paid-on-call). Excluding them understates coverage.
+  Traylor; three of the four are paid-on-call). Excluding them understates coverage.
 
 Therefore `dim_person_medic` is a small **curated** table, 9 rows, each with an explicit
 basis:
@@ -104,32 +104,32 @@ Corroborated by certificates, all matching departmental recollection: Katelyn Be
 
 Lapsed credentials are a **data-quality flag with a review list**, not a coverage gate.
 Gating on `expiration_date` would drop Elkhorn from 80% to 73% overall and 74% to 60% in
-2026 — a 50-day swing from one person's unrenewed record.
+2026, a 50-day swing from one person's unrenewed record.
 
 ## Known defects to resolve in the model, not in the data
 
 1. **Station names.** 43% of incidents have no primary station; `Elkhorn Station` and
    `Elkhorn Station - HQ` are the same place; `Station 2` / `Station 3` are obsolete
    naming the department dropped.
-2. **Apparatus spellings.** `E60`/`ENG60`, `E64`/`ENG64` — same rig, two codes.
-3. **Incident numbers are not unique.** Three schemes coexist — `99-999`, `9999999`, and
-   dispatch-generated forms like `BC011326-068` — and **numbers are reused across years**:
+2. **Apparatus spellings.** `E60`/`ENG60`, `E64`/`ENG64`: same rig, two codes.
+3. **Incident numbers are not unique.** Three schemes coexist (`99-999`, `9999999`, and
+   dispatch-generated forms like `BC011326-068`), and **numbers are reused across years**:
    `24-454` is a 2024 NFIRS incident while a 2026 NERIS record also carries `24-454`.
    A single-column primary key silently overwrote 13 real incidents before this was
    caught, so the table uses a surrogate `incident_uid`. Duplicates inside one era are
    deduped by keeping the row with the most populated fields (NFIRS 78, NERIS 7) and are
-   logged. Never use the incident number as a join key on its own — pair it with year.
-4. **The "113 incidents with no unit rows" finding was wrong** — it was duplicate incident
+   logged. Never use the incident number as a join key on its own; pair it with year.
+4. **The "113 incidents with no unit rows" finding was wrong**: it was duplicate incident
    numbers in the export (78 keys repeated, 36 rows with a blank number). Every distinct
    incident has unit rows.
 5. **Unit-level data stops at the NFIRS era.** Only 32 of 693 incidents in 2026 have
    apparatus rows, so time-on-scene and unit-hours are solid through 2025 and thin in
    2026. State the era whenever a unit-level number is published. 37 apparatus rows carry
-   no incident number at all and cannot be joined to anything — they remain in
+   no incident number at all and cannot be joined to anything; they remain in
    `fact_unit_response` with `incident_key IS NULL` and must be excluded from any join.
    Separately, 12 staffing rows share a person, day, assignment and work type but differ
    by qualifier (someone covering two slots); these are real records, not duplicates.
-6. **Class regex matched substrings — resolved by moving to type codes.** `ice` matched
+6. **Class regex matched substrings, resolved by moving to type codes.** `ice` matched
    "serv**ice**", classifying 374 "Emergency medical service, other" calls as backcountry
    rescues; word boundaries fixed that one, but `confined` and `water` kept misfiling
    cooking fires and water leaks. Classification now reads the NFIRS code first (see
@@ -142,21 +142,21 @@ Gating on `expiration_date` would drop Elkhorn from 80% to 73% overall and 74% t
    The only reliable incident-level duration is `Alarm To Last Unit Cleared` (98.6%).
    Time on scene therefore comes from the unit grain: `Arrived To Cleared`.
 6. **Date formats differ between sources** (`Oct 1, 2025` vs `2026-07-31`).
-7. **Lat/long populated for only 5% of incidents** — geographic segmentation is not
+7. **Lat/long populated for only 5% of incidents**: geographic segmentation is not
    available. Segment by incident type and mutual-aid flag instead.
 
 ## Analyst decisions already taken
 
 - **Analysis window starts 2020-01-01.** Incident counts jump 2.19x between 2019 (292)
-  and 2020 (431) — a reporting-practice change, not workload. Within 2020-2025 growth
+  and 2020 (431), a reporting-practice change, not workload. Within 2020-2025 growth
   is 431 → 676 (+57%), which is defensible. Charts spanning the boundary must be
   labelled or omitted.
 - **Two baskets, not one filter.** Response-time KPIs use in-scope incidents only
   (exclude `Nfpa Mutual Aid Given = yes`, dispatch→arrival > ~25 min, time on scene
-  > ~4 h). Excluded work is reported separately as burden — unit-hours consumed. This
+  > ~4 h). Excluded work is reported separately as burden (unit-hours consumed). This
   follows the NFPA 1710/1720 convention that out-of-scope work is workload, not
   response performance.
-- Wildland deployments and backcountry rescues are real work, not bad data — they are
+- Wildland deployments and backcountry rescues are real work, not bad data: they are
   segmented out of performance measures and counted as burden.
 
 ## Two agencies, one roof
@@ -165,21 +165,21 @@ SVFD holds a contract to manage NBCFD (North Blaine County Fire District). Both
 jurisdictions' calls count as one operationally, but the data must stay **separable** so
 jurisdiction-level questions remain answerable. Every fact row carries `org_code`:
 
-- `SVFD` — Sun Valley Fire Department
-- `NBCFD` — North Blaine County Fire District
+- `SVFD`: Sun Valley Fire Department
+- `NBCFD`: North Blaine County Fire District
 
 Source of the flag: **not** the incident number. Crews freely mix the department's
 `26-NNN` series with the dispatch-generated number (`BC011326-068`, `NBCFD2026…`), so the
-format carries no jurisdiction information — someone using the dispatch number could be
+format carries no jurisdiction information: someone using the dispatch number could be
 running either agency's call. Only an explicit `SVFD`/`NBCFD` prefix is authoritative.
 
 Resolution order, recorded in `org_source`:
 
-1. `prefix` — incident number starts with `SVFD` or `NBCFD`. Authoritative.
-2. `zone_inferred` — from the location zone: `Sun Valley` → SVFD;
+1. `prefix`: incident number starts with `SVFD` or `NBCFD`. Authoritative.
+2. `zone_inferred`: from the location zone: `Sun Valley` → SVFD;
    `BCSO North` / `BCSO Central` / `BCSO South` → NBCFD (county). Never presented as
    fact without the flag.
-3. `NULL` — left unresolved rather than defaulted. 210 of 720 NERIS rows, mostly blank
+3. `NULL`: left unresolved rather than defaulted. 210 of 720 NERIS rows, mostly blank
    zone (187 in 2026).
 
 Measured 2026 split: SVFD 276, NBCFD 232, unresolved 187.
@@ -196,7 +196,7 @@ Default reporting view is combined; jurisdiction filters are a first-class optio
 |---|---|---|
 | `ELK` | Elkhorn | HQ, staffed daily |
 | `GH` | Greenhorn | staffed ~24% of days in 2025, ~80% in 2026 |
-| `GB` | Griffin Butte | **unstaffed**, 13100 ID-75, Ketchum ID 83340 — very low response volume (5 of 690 in 2026) |
+| `GB` | Griffin Butte | **unstaffed**, 13100 ID-75, Ketchum ID 83340, very low response volume (5 of 690 in 2026) |
 
 Griffin Butte is unstaffed, so its handful of records should never be read as a station
 workload signal; it appears in the data mainly as a reporting location.
@@ -206,7 +206,7 @@ workload signal; it appears in the data mainly as a reporting location.
 Reports are written after the fact, and some are outstanding for months. Recent months
 are therefore always under-counted, and the shortfall is largest in the newest month.
 Evidence: 2026 runs 22/13/11/10 per month for Jan–Apr, then 58/78/105/103/71/93 from May,
-against a 2025 baseline of ~56/month — a shape that matches reporting catch-up, not a
+against a 2025 baseline of ~56/month, a shape that matches reporting catch-up, not a
 collapse in demand.
 
 Rules:
@@ -314,11 +314,11 @@ Each metric gets a written definition and a unit test. Draft set:
 
 - **Included:** assignments `Elkhorn` and `Greenhorn`; work types `Regular`, `POC Shift`,
   `Trade ON`, `Overtime`. Paid-on-call medics appear only as `POC Shift` rows (Hannah 13,
-  Nadav 9, Zack 13 over the window) — filtering to `Regular` alone silently deletes them.
-- **Excluded:** `Training` / `Fire Academy` (not coverage), and non-station work —
+  Nadav 9, Zack 13 over the window); filtering to `Regular` alone silently deletes them.
+- **Excluded:** `Training` / `Fire Academy` (not coverage), and non-station work:
   `Event Staffing`, `EMS Standby`, `Wildland Deployment`, `Special Assignment`.
 - **Ambiguous, excluded conservative:** `Day Shift` (37), `Probie- Day Shift` (71),
-  `POC Shift 24hr` (48) — probably station coverage under other names. Report the
+  `POC Shift 24hr` (48), probably station coverage under other names. Report the
   conservative figure and note the alternative.
 - **Actual vs planned:** anything after the pull date is published schedule, not worked
   days. Always carry `is_actual` and never let planned coverage into a performance

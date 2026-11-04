@@ -99,7 +99,7 @@ lives only in a conversation.
 
 ## Synthetic build (public copy)
 
-- `etl/synthetic.py` — fixed seed (20260101), stdlib only, writes `data/synthetic/raw/`
+- `etl/synthetic.py`: fixed seed (20260101), stdlib only, writes `data/synthetic/raw/`
   (7 inputs, real header dialects) and `data/synthetic/curated/dim_person_medic.csv`.
   Deterministic: a rebuild reproduces the committed database exactly.
 - Env overrides are the only fork in the road: `SVFD_RAW`, `SVFD_CURATED`, `SVFD_CLEAN`,
@@ -109,7 +109,7 @@ lives only in a conversation.
 - Verified numbers: 3,802 incidents / 5,948 unit responses / 7,189 staffing rows / 31
   people; p50 7.2, p90 13.3; basket 89.2%; 90% of incidents geocoded; paramedic on 79% of
   actual staffed station-days; zero real names, zero reused coordinates.
-- **Decided (Nov 2026):** the public build **types the NERIS era** — 97% of rows carry the
+- **Decided (Nov 2026):** the public build **types the NERIS era**: 97% of rows carry the
   incident's call-type code, so 2026 reads EMS 275 / Fire 120 / Service 101 / MVA 36 /
   Wildland 17 / Backcountry rescue 5 instead of 100% `Untyped`. And **NERIS unit coverage
   is 55%** (`NERIS_UNIT_SHARE = 0.625`, which lands at 55.8% after the 0.6x discount on
@@ -119,7 +119,7 @@ lives only in a conversation.
   generator parameters, deviations) and `docs/FINDINGS_SYNTHETIC.md` (the results it
   produces). `docs/SCHEMA.md` and `docs/FINDINGS.md` stay the private build's write-ups.
 - Still open before publishing: **`docs/SCHEMA.md` and this file still contain real
-  personnel names** — neither ships; regenerate `docs/img/*.png` from the synthetic build
+  personnel names**. Neither ships; regenerate `docs/img/*.png` from the synthetic build
   (the current screenshots are real aggregates); refresh the README headline numbers, which
   still quote the private dataset.
 
@@ -154,7 +154,7 @@ lives only in a conversation.
    "Fire NERIS" on all 737 rows and the dispatch code is blank on 719, so the NERIS era
    cannot be typed from that pull. They are typed instead from Elite's NERIS incident
    list (`Primary Incident Type` -> `etl/taxonomy.py::classify_neris`), which leaves
-   **83 Untyped (1.5%)** — records with no type entered at all.
+   **83 Untyped (1.5%)**: records with no type entered at all.
 4. **Elite `reportVersionID` is volatile** - store `reportID`, resolve version at pull time.
 5. **First Due needs `X-Requested-With: XMLHttpRequest`** or the server returns the SPA
    shell instead of JSON. Session cookie is HttpOnly, so fetch from inside the page.

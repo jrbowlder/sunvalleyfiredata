@@ -3,7 +3,7 @@
 The warehouse in this repo is the source of truth; this directory is the code that turns it into
 the dashboard the department actually looks at.
 
-Live: <https://sunvalleyfiredepartment.com> (public, no login) — admin view at
+Live: <https://sunvalleyfiredepartment.com> (public, no login); admin view at
 `dash.sunvalleyfiredepartment.com`.
 
 ## What this is
@@ -12,7 +12,7 @@ Live: <https://sunvalleyfiredepartment.com> (public, no login) — admin view at
 25 question cards across Demand, Response, Stations, Map, Coverage and Burden, plus the From/To date
 filters, laid out on a grid and reconciled against the analysis scripts.
 
-It is idempotent — it wipes the target collection and rebuilds, then runs every card's query and
+It is idempotent: it wipes the target collection and rebuilds, then runs every card's query and
 reports which ones failed, so a rebuild either reproduces the dashboard or tells you what broke.
 
 ```bash

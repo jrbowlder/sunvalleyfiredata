@@ -74,7 +74,7 @@ an interactive login and the session lives in a real browser window.
 
 ## The sources
 
-### ImageTrend Elite — `idaho.imagetrendelite.com`
+### ImageTrend Elite (`idaho.imagetrendelite.com`)
 
 | Source | Report ID | Dataset | Fields | Output |
 |---|---|---|---|---|
@@ -82,23 +82,23 @@ an interactive login and the session lives in a real browser window.
 | `CAPSTONE Apparatus Fact` | `70C138C9-2EA4-4200-8C59-FAD643CE5D8A` | Fire Incidents (NFIRS) | 17 | `elite_apparatus_fact.csv` |
 | *unnamed NERIS report* | `0549444C-5655-4130-9D1D-6939A95D0443` | NERIS Fire | 18 | `elite_neris_incident_fact.csv` |
 
-`reportVersionID` is **volatile** — it changes every time a report's columns are edited.
+`reportVersionID` is **volatile**: it changes every time a report's columns are edited.
 Store the `reportID` (stable) and resolve the version at pull time by opening the report
 and reading the hidden `reportVersionID` field. Do not hard-code versions.
 Current versions at the time of writing: incident `68378EF9-…`, apparatus `6FA4F23F-…`,
 NERIS `2078A632-…`.
 
-The NERIS report is still unnamed in Elite — worth renaming to `CAPSTONE NERIS Incident
+The NERIS report is still unnamed in Elite, worth renaming to `CAPSTONE NERIS Incident
 Fact` for consistency and for anyone else browsing the report library.
 
-### First Due — `sizeup.firstduesizeup.com`
+### First Due (`sizeup.firstduesizeup.com`)
 
 | Source | ID | Endpoint | Fields | Output |
 |---|---|---|---|---|
 | `SHIFT COVERAGE - TEST` | `104884` | `POST /report/getResultList` | date, person, qualifier, rank, work type, assignment | `fd_shift_coverage.json` |
 | `SVFD-PERS: Active Certifications by Member` | `71261` | `POST /report/getResultList` | person, cert, issue, expiry | `fd_certifications.json` |
 | `Personnel Shift Distribution` | `103415` | `POST /report/getResultList` | shift, headcount, pct | `fd_personnel_shift.json` |
-| Groups (EMT / Paramedic / POC / …) | — | `GET /shift/group/getGroups` | group, members | `fd_groups.json` |
+| Groups (EMT / Paramedic / POC / …) | n/a | `GET /shift/group/getGroups` | group, members | `fd_groups.json` |
 
 Two details that cost time to discover: requests need
 `X-Requested-With: XMLHttpRequest` or the server returns the SPA shell instead of JSON,
@@ -116,11 +116,11 @@ history, and 4 of 9 medics have no paramedic credential on file.
 
 ### Deliberately excluded
 
-- **First Due incident/unit-hour reports** — the module is unpopulated (7 rows for 2026,
+- **First Due incident/unit-hour reports**: the module is unpopulated (7 rows for 2026,
   0 for 2025 and 2021–2024).
-- **First Due time clock** — not used; payroll is elsewhere.
-- **EPCR / patient data** — out of scope by policy.
-- **Elite Hydrants / Inventory datasets** — inventory lives in the separate
+- **First Due time clock**: not used; payroll is elsewhere.
+- **EPCR / patient data**: out of scope by policy.
+- **Elite Hydrants / Inventory datasets**: inventory lives in the separate
   `~/Documents/SVFD_Inventory` project; hydrants are not in the capstone.
 
 ## Known fragility
