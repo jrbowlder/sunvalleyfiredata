@@ -268,20 +268,29 @@ card("Coverage", "Coverage by station (2025+)", f"""WITH s AS (
 w AS (SELECT COUNT(DISTINCT work_date) AS d FROM s)
 SELECT {STATION} AS station,
   ROUND(SUM(CASE WHEN headcount > 0 THEN 1 ELSE 0 END) * 100.0 / (SELECT d FROM w), 1) AS staffed_pct,
-  ROUND(SUM(CASE WHEN has_paramedic = 1 THEN 1 ELSE 0 END) * 100.0 / (SELECT d FROM w), 1) AS paramedic_pct
+  CASE WHEN MIN(station_code) = 'ELK'
+       THEN ROUND(SUM(CASE WHEN has_paramedic = 1 THEN 1 ELSE 0 END) * 100.0 / (SELECT d FROM w), 1)
+  END AS paramedic_pct
 FROM s GROUP BY 1 ORDER BY 3 DESC""", "bar", 12, 8,
      {"graph.dimensions": ["station"], "graph.metrics": ["staffed_pct", "paramedic_pct"]},
      "Percent of calendar days in range, not percent of staffed days. The denominator is every "
      "date the calendar covers, otherwise an unstaffed station looks fully covered by virtue of "
-     "having few rows. Actual staffing only - planned shifts after the pull date are excluded.")
+     "having few rows. Actual staffing only - planned shifts after the pull date are excluded. "
+     "Paramedic coverage is shown for Elkhorn only, because medic coverage is an Elkhorn "
+     "commitment; Greenhorn has no bar rather than a misleading one.")
 card("Coverage", "Paramedic coverage by month", f"""SELECT substr(work_date,1,7) AS month, {STATION} AS station,
   ROUND(SUM(has_paramedic) * 100.0 / COUNT(*), 1) AS paramedic_pct
-FROM v_station_day WHERE is_actual = 1 AND work_date >= {DF} AND work_date <= {DT}
+FROM v_station_day WHERE is_actual = 1 AND station_code = 'ELK'
+  AND work_date >= {DF} AND work_date <= {DT}
 GROUP BY 1,2 ORDER BY 1""", "line", 12, 8,
      {"graph.dimensions": ["month"], "graph.metrics": ["paramedic_pct"],
       "graph.y_axis.title_text": "% of days"},
-     "Uses confirmed start dates only (certificate or department-confirmed). Three members carry "
-     "an estimated date and are excluded, so this is the lower bound of clinical coverage.")
+     "Elkhorn only, because medic coverage is an Elkhorn commitment - a medic-certified member "
+     "assigned to Greenhorn is a person's credential, not a coverage promise, so that line would "
+     "read as service the department does not run. Elkhorn's share of calendar days in the month "
+     "with a paramedic on duty; uses confirmed start dates only (certificate or "
+     "department-confirmed), so three members with estimated dates are excluded and this is the "
+     "lower bound.")
 # --------------------------------------------------------------------------------- Burden
 card("Burden", "Work split - performance vs burden", f"""SELECT 'Performance' AS basket, COUNT(*) AS incidents
 FROM {INC} AND {PERF}
@@ -507,6 +516,14 @@ def main():
                       "text": METHOD}})
     st, out = api("PUT", f"/api/dashboard/{did}", {"dashcards": cards})
     print("layout:", st, "dashcards:", len(out.get("dashcards", [])) if isinstance(out, dict) else out)
+
+    # Every rebuild creates a new dashboard, which orphans the previous public UUID - the apex would
+    # point at a 404. Re-enable the public link and record the state the redirector reads.
+    st, link = api("POST", f"/api/dashboard/{did}/public_link")
+    pub = link.get("uuid")
+    with open(os.environ.get("MB_STATE_FILE", os.path.expanduser("~/metabase/state.json")), "w") as fh:
+        json.dump({"dashboard_id": did, "public_uuid": pub}, fh, indent=2)
+    print("public uuid:", pub, "| state.json written")
 
     bad = 0
     for cid, c in made:

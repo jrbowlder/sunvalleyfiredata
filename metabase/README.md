@@ -37,6 +37,14 @@ python3 build_dashboard.py
 - **Palette.** Red `#cc0000` for primary series, gold `#bf9000` for the p90 tail and the burden
   slice, navy `#2f6fa8` where a third series is needed. Metabase OSS will not let a pin map colour
   points by category, so the map is location only.
+- **Paramedic coverage is an Elkhorn commitment.** The monthly chart filters to `station_code =
+  'ELK'` and the station chart returns `NULL` medic coverage for every other station: a
+  medic-certified member assigned to Greenhorn is a credential, not a service the department runs.
+  Both cards once split by station, and Metabase summed the split percentages (100% + 35%), which is
+  how a coverage chart came to show 155%.
+- **The public link self-heals.** Each rebuild creates a new dashboard, so the builder re-enables its
+  public link and writes `state.json` with the dashboard id and public UUID; the redirector reads
+  that per request instead of a hardcoded UUID.
 - **Refresh.** `python3 etl/build.py` then `~/metabase/after-etl.sh`: new rows appear immediately
   because native SQL reads the file per request, but the dashboard's To-date default is baked into
   the dashboard and has to be moved forward, or the public view quietly keeps ending at the old
