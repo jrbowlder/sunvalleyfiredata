@@ -1,0 +1,18 @@
+# environment
+.venv/
+__pycache__/
+*.pyc
+.streamlit/
+
+# department source material - never committed, refreshed via etl/pull/SOURCES.md
+data/raw/
+# ...except the public OSM reference, so the repo geocodes without hitting Overpass
+!data/raw/osm_streets.csv
+!data/raw/osm_places.csv
+
+# generated artefacts
+data/clean/
+warehouse.db
+
+# curated personnel records - real member names, never committed
+data/curated/

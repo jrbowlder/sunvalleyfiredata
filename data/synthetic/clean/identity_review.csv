@@ -1,0 +1,20 @@
+raw_value,canonical,status
+Elkhorn,ELK,mapped
+Elkhorn Station,ELK,mapped
+Elkhorn Station - HQ,ELK,mapped
+Griffin Butte,GB,mapped
+Station 3,GB,mapped
+Greenhorn,GH,mapped
+Station 2,GH,mapped
+,,UNMAPPED
+City Hall,,UNMAPPED
+"[apparatus] C1, Chief 1",C1,mapped
+"[apparatus] E 60, E60, ENG60, Engine 60",E60,mapped
+"[apparatus] E61, ENG61, Engine 61",E61,mapped
+"[apparatus] E62, ENG62, Engine 62",E62,mapped
+"[apparatus] E64, ENG64, Engine 64",E64,mapped
+"[apparatus] M60, Medic 60",M60,mapped
+"[apparatus] M62, Medic 62",M62,mapped
+"[apparatus] SQ1, SQD1",SQD1,mapped
+"[apparatus] T61, TANK61, Tanker 61",T61,mapped
+"[apparatus] T62, Tanker 62",T62,mapped
