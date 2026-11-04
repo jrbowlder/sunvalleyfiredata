@@ -1,7 +1,7 @@
 # SVFD Operations Warehouse
 
 One warehouse over three systems that don't talk to each other, and a dashboard on top
-of it — so the department can finally answer operational questions at any time scale.
+of it, so the department can finally answer operational questions at any time scale.
 
 A fire department's answers live in silos. Incident reporting lives in **ImageTrend
 Elite**, which stops at NERIS with a second set of field names and a second set of
@@ -39,7 +39,7 @@ flowchart LR
         A2["NERIS<br/>NERIS era"]
         A3["First Due<br/>schedule + certifications"]
     end
-    subgraph etl["ETL — one loader per source"]
+    subgraph etl["ETL, one loader per source"]
         B1["load_elite.py"]
         B2["load_neris.py"]
         B3["load_staffing.py"]
@@ -75,7 +75,7 @@ count per source, so a source that silently contributes nothing is visible immed
 
 ## Quickstart
 
-The pipeline is standard library only — no dependencies. The dashboard needs Streamlit,
+The pipeline is standard library only, with no dependencies. The dashboard needs Streamlit,
 pandas and Plotly.
 
 ```bash
@@ -94,7 +94,7 @@ Raw pulls live in `data/raw/` and are immutable; every file in `data/clean/` and
 ### Synthetic build (the public copy)
 
 `etl/synthetic.py` writes a complete set of fake raw inputs in the same header formats
-the loaders parse — invented personnel, street names and incident numbers, with a
+the loaders parse: invented personnel, street names and incident numbers, with a
 plausible shape (demand growth 2020–2026, p50 ≈ 7 min / p90 ≈ 13 min, two stations, ~80%
 paramedic coverage). Nothing but the public OSM street reference is shared with the real
 build, which is why the geocoder still works.
@@ -114,21 +114,21 @@ in a different order each run, so every table's content matches but the database
 bytes do not.
 
 The `SVFD_*` variables are the only difference between the two builds: unset, every
-script reads and writes exactly where it always did. The refresh steps for each source —
-report IDs, endpoints, the quirks — are in [`etl/pull/SOURCES.md`](etl/pull/SOURCES.md).
+script reads and writes exactly where it always did. The refresh steps for each source (report
+IDs, endpoints, the quirks) are in [`etl/pull/SOURCES.md`](etl/pull/SOURCES.md).
 
 The synthetic build deliberately differs from the private pull in three ways, so that a
 public demo is usable: the NERIS era is **typed** (97% of rows carry a call-type code,
 rather than 98% blank), NERIS-era **unit coverage is 55%** (against ~5% real), and every
-person is invented. Every other quirk of the source systems — three numbering schemes,
-repeated numbers across years, two timestamp families, mixed spellings — is reproduced on
+person is invented. Every other quirk of the source systems (three numbering schemes,
+repeated numbers across years, two timestamp families, mixed spellings) is reproduced on
 purpose.
 
-- [`docs/SCHEMA_SYNTHETIC.md`](docs/SCHEMA_SYNTHETIC.md) — the schema of the shipped
+- [`docs/SCHEMA_SYNTHETIC.md`](docs/SCHEMA_SYNTHETIC.md): the schema of the shipped
   (synthetic) build, including the invented roster and the generator's parameters.
-- [`docs/FINDINGS_SYNTHETIC.md`](docs/FINDINGS_SYNTHETIC.md) — the results that build
+- [`docs/FINDINGS_SYNTHETIC.md`](docs/FINDINGS_SYNTHETIC.md): the results that build
   produces, reproducible from the scripts above.
-- [`docs/SCHEMA.md`](docs/SCHEMA.md) and [`docs/FINDINGS.md`](docs/FINDINGS.md) — the
+- [`docs/SCHEMA.md`](docs/SCHEMA.md) and [`docs/FINDINGS.md`](docs/FINDINGS.md): the
   private dataset's write-ups, kept for the record and not part of the public copy.
 
 ## Repo layout
@@ -136,7 +136,7 @@ purpose.
 ```
 data/raw/        immutable source pulls (Elite CSVs, First Due JSON)
 data/curated/    hand-checked dimensions (the medic list)
-data/clean/      generated review files — identity conflicts, unresolved org
+data/clean/      generated review files: identity conflicts, unresolved org
 docs/            SCHEMA.md + FINDINGS.md (private build); SCHEMA_SYNTHETIC.md +
                  FINDINGS_SYNTHETIC.md (the shipped build)
 etl/             one loader per source + build.py orchestrator
@@ -162,7 +162,7 @@ that value, so the two agencies the department runs stay separable; unit and sta
 inherit jurisdiction through their parent incident or station.
 
 **Derived measures are computed at query time from stored timestamps, never stored as
-typed values** — response time, time on scene and unit-hours all come from the
+typed values.** Response time, time on scene and unit-hours all come from the
 timestamps plus a written definition, so a definition can change without a rebuild and an
 auditor can follow a number back to the field it came from.
 
@@ -182,11 +182,11 @@ Call types are a two-level taxonomy driven by the NFIRS type code: **Fire** (str
 vehicle, alarms, HazMat, other), **Wildland**, **EMS**, **Motor vehicle accident** (with
 injury, no injury, vehicle extrication, cleanup), **Backcountry rescue** and **Service**,
 each with subtypes. Mutual aid is a flag, not a
-type — a mutual-aid structure fire counts as a structure fire.
+type: a mutual-aid structure fire counts as a structure fire.
 
 Two baskets, not one filter. **Performance** uses in-scope incidents only: no mutual aid
 given, not a wildland deployment, arrival within 25 minutes. Everything excluded is
-reported separately as **burden** — unit-hours consumed — following the NFPA 1710/1720
+reported separately as **burden** (unit-hours consumed), following the NFPA 1710/1720
 convention that out-of-scope work is workload, not response performance. Baskets travel
 together: a response-time percentile is never quoted without the share of work it covers.
 
@@ -199,13 +199,13 @@ Full write-up with denominators in [`docs/FINDINGS.md`](docs/FINDINGS.md). Headl
 - **Response performance did not degrade.** p90 sits between 13.0 and 14.7 minutes in
   every year of the series, and p50 at 6.7-7.3. The department absorbed the growth.
 - **Time on scene is stable** at a 14-19 minute median.
-- **Staffing is unrelated to demand** — 2.09 calls per station-day with two crew on duty,
+- **Staffing is unrelated to demand:** 2.09 calls per station-day with two crew on duty,
   2.10 with three. The rotation sets the staffing; the pager sets the workload.
 - **Greenhorn went from staffed 46% of days in 2025 to 93% in 2026**, and its share of
   calls grew with it.
 
 The number that would have been wrong: an early version reported 113 incidents with no
-unit rows. That was duplicate incident numbers in the export, not missing data — every
+unit rows. That was duplicate incident numbers in the export, not missing data. Every
 distinct incident has unit rows.
 
 ## Decisions that make the numbers survive review
@@ -215,7 +215,7 @@ distinct incident has unit rows.
    personnel names are reconciled in one place, and the review lists are committed under
    `data/clean/` so any mapping can be challenged.
 2. **A business key is not a primary key until proven unique across history.** Incident
-   numbers repeat across years — the same `24-454` is a 2024 record and a 2026 record — so
+   numbers repeat across years (the same `24-454` is a 2024 record and a 2026 record), so
    the fact table uses a surrogate id. A `TEXT PRIMARY KEY` plus `INSERT OR REPLACE` had
    silently replaced 13 real incidents while every row count still looked plausible.
 3. **Two timestamp families, coalesced with provenance.** NERIS carries dispatch-side and
@@ -239,7 +239,7 @@ distinct incident has unit rows.
   apparatus rows, so time-on-scene and unit-hours are published through 2025 only.
 - **Station attribution** is the station on the report, not necessarily the responding
   one, and 42% of records carry no station at all.
-- **Jurisdiction is only resolvable from 2026** — the NFIRS era has no reliable
+- **Jurisdiction is only resolvable from 2026.** The NFIRS era has no reliable
   SVFD/NBCFD signal, so jurisdiction comparisons start there and say so.
 - **Staffing calendar starts 2024-12-31**, so coverage questions cannot extend backwards.
 - **Location is street-level, not address-level.** 248 incidents carry a coordinate a
@@ -252,12 +252,12 @@ distinct incident has unit rows.
 ## Data and privacy
 
 No patient, name-level or address-level record is exported, and none of it is required for
-any metric here — everything is incident, apparatus and station-shift grain, aggregated at
+any metric here: everything is incident, apparatus and station-shift grain, aggregated at
 report time. `data/raw/` is the department's source material and is not for
 redistribution; the dashboard screenshot is real aggregates from the private dataset.
 
 For a public copy of this repo, `etl/synthetic.py` writes the same schema with plausible
-distributions — invented people, addresses and incident numbers — so a reviewer can clone
+distributions (invented people, addresses and incident numbers), so a reviewer can clone
 and run the whole pipeline with **zero real records**. The public copy ships that build
 and the two `*_SYNTHETIC.md` documents; `data/raw/`, `data/clean/` and the real
 `warehouse.db` stay out of the repository.
