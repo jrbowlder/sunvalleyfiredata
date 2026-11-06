@@ -17,6 +17,28 @@ shows up.
 
 ![Incident map](docs/img/map.png)
 
+## Motivation
+
+The department's operational questions live in three systems that don't join. Incident
+reporting is **ImageTrend Elite**, which hands off to NERIS under a second set of field
+names and a second set of reporting habits; the shift calendar, roster and certifications
+are in **First Due**. Neither system can answer a question that spans both, so those
+questions get answered by hand, once, in a spreadsheet, and the answer is gone the moment
+the period changes.
+
+The vendor software also ships hundreds of canned reports, including response-time
+fractiles and average time on scene. Recomputing those would be a tutorial. The value is in
+what no single system can produce: incident volume read against the staffing calendar at an
+arbitrary date range, station coverage against where the calls actually go, and the share of
+workload that falls outside the response-performance measure, with the identity resolution
+and the metric definitions written down, so any number can be traced back to the field it
+came from.
+
+It was built as the capstone for Boot.dev's Data Analyst path. Real department records
+cannot leave the department, so the public copy ships a synthetic dataset that drives the
+identical pipeline: clone this repository and you can run the build, both analyses and the
+dashboard end to end with no real records in it.
+
 ## What it answers
 
 | Question | Where the answer comes from |
@@ -73,49 +95,104 @@ flowchart LR
 `etl/build.py` deletes the database and runs the three loaders in order, printing a row
 count per source, so a source that silently contributes nothing is visible immediately.
 
-## Quickstart
+## Quick Start
 
-The pipeline is standard library only, with no dependencies. The dashboard needs Streamlit,
-pandas and Plotly.
+The pipeline is standard library only, so the ETL needs nothing installed but Python 3.10
+or newer. The dashboard needs Streamlit, pandas and Plotly.
 
 ```bash
+git clone https://github.com/jrbowlder/sunvalleyfiredata.git
+cd sunvalleyfiredata
+
 uv venv .venv
 uv pip install -r requirements.txt
+```
 
-python3 etl/build.py                        # rebuild warehouse.db from data/raw/
+Then build and run the public copy, which is the synthetic dataset this repository ships:
+
+```bash
+python3 etl/synthetic.py        # write data/synthetic/raw, deterministic, ~1 s
+
+export PYTHONHASHSEED=0 \
+       SVFD_RAW=data/synthetic/raw \
+       SVFD_CURATED=data/synthetic/curated \
+       SVFD_CLEAN=data/synthetic/clean \
+       SVFD_DB=data/synthetic/warehouse.db
+
+python3 etl/build.py                        # rebuild the warehouse, ~2 s
 python3 analysis/01_demand_performance.py   # demand, response percentiles, burden
 python3 analysis/02_demand_vs_coverage.py   # demand against the staffing calendar
 .venv/bin/streamlit run app/app.py          # dashboard on localhost:8501
 ```
 
-Raw pulls live in `data/raw/` and are immutable; every file in `data/clean/` and
-`warehouse.db` itself is generated.
-
-### Synthetic build (the public copy)
-
-`etl/synthetic.py` writes a complete set of fake raw inputs in the same header formats
-the loaders parse: invented personnel, street names and incident numbers, with a
-plausible shape (demand growth 2020–2026, p50 ≈ 7 min / p90 ≈ 13 min, two stations, ~80%
-paramedic coverage). Nothing but the public OSM street reference is shared with the real
-build, which is why the geocoder still works.
-
-```bash
-python3 etl/synthetic.py                       # deterministic; rewrites data/synthetic/raw
-PYTHONHASHSEED=0 \
-SVFD_RAW=data/synthetic/raw \
-SVFD_CURATED=data/synthetic/curated \
-SVFD_CLEAN=data/synthetic/clean \
-SVFD_DB=data/synthetic/warehouse.db \
-python3 etl/build.py                            # same pipeline, no real records
-```
-
 `PYTHONHASHSEED=0` pins Python's per-process hash seed. Without it the loaders insert rows
-in a different order each run, so every table's content matches but the database file's
+in a different order on every run, so each table's content matches but the database file's
 bytes do not.
 
-The `SVFD_*` variables are the only difference between the two builds: unset, every
-script reads and writes exactly where it always did. The refresh steps for each source (report
-IDs, endpoints, the quirks) are in [`etl/pull/SOURCES.md`](etl/pull/SOURCES.md).
+The `SVFD_*` variables are the only difference between the public build and the private one.
+Unset, every script reads and writes where it always did: `data/raw/` holds the real pulls
+and `warehouse.db` sits at the repo root. Raw pulls are immutable; every file in
+`data/clean/` and every `warehouse.db` is generated. The refresh steps for each source
+(report IDs, endpoints, the quirks) are in [`etl/pull/SOURCES.md`](etl/pull/SOURCES.md).
+
+## Usage
+
+### The dashboard
+
+`.venv/bin/streamlit run app/app.py` opens <http://localhost:8501>. The sidebar filters every
+tab:
+
+- **Date range** counts incidents by incident date; the staffing views read the shift
+  calendar over the same range.
+- **Station**, **Jurisdiction** (`SVFD`, `NBCFD`, unresolved) and **Call type** narrow the
+  population. Jurisdiction is only resolvable from 2026, because the NFIRS era carries no
+  reliable flag.
+- **Include incidents with no station on the report** is on by default. 42% of records carry
+  no primary station, so unticking it shows station-attributed work only, which is a subset
+  and not the workload.
+
+| Tab | What it shows |
+|---|---|
+| Demand | Monthly and annual incident counts, with the report-lag tail shaded |
+| Response | In-scope p50/p90/p95 response times, turnout and travel, time on scene |
+| Stations | Calls and in-scope p90 per station, on the same basket as the KPIs |
+| Map | Incident points, each labelled with its geocoding precision |
+| Coverage | Staffed station-days, paramedic coverage, and calls per crew size |
+| Burden | In-scope work against the out-of-scope workload, in incidents and unit-hours |
+
+Every view carries the warehouse's data-as-of date, and any month inside the reporting lag is
+shaded rather than dropped, so an incomplete tail cannot be read as a decline.
+
+### The analysis scripts
+
+`analysis/01_demand_performance.py` and `analysis/02_demand_vs_coverage.py` print their own
+tables with denominators, which is how every figure in `docs/FINDINGS_SYNTHETIC.md` can be
+regenerated on demand. Each reads `warehouse.db` and honours `SVFD_DB`:
+
+```bash
+SVFD_DB=data/synthetic/warehouse.db python3 analysis/01_demand_performance.py
+```
+
+### The warehouse directly
+
+Anything the scripts and dashboard don't cover is a query away. The three fact tables carry
+three different grains, so check the grain before counting:
+
+```bash
+sqlite3 data/synthetic/warehouse.db \
+  "select year, count(*) as incidents, round(avg(alarm_to_arrival_min), 1) as mean_minutes
+     from fact_incident where is_actual = 1 group by year order by year;"
+```
+
+`is_actual = 1` filters out planning rows. `docs/SCHEMA.md` documents every table and column.
+
+### The synthetic build
+
+`etl/synthetic.py` writes a complete set of fake raw inputs in the same header formats the
+loaders parse: invented personnel, street names and incident numbers, with a plausible shape
+(demand growth 2020-2026, p50 around 7 min and p90 around 13 min, two stations, roughly 80%
+paramedic coverage). Nothing but the public OSM street reference is shared with the real
+build, which is why the geocoder still works.
 
 The synthetic build deliberately differs from the private pull in three ways, so that a
 public demo is usable: the NERIS era is **typed** (97% of rows carry a call-type code,
@@ -254,20 +331,22 @@ distinct incident has unit rows.
 No patient, name-level or address-level record is exported, and none of it is required for
 any metric here: everything is incident, apparatus and station-shift grain, aggregated at
 report time. `data/raw/` is the department's source material and is not for
-redistribution; the dashboard screenshot is real aggregates from the private dataset.
+redistribution, with one exception: `data/raw/osm_streets.csv` and `data/raw/osm_places.csv`
+are public OpenStreetMap extracts, committed so the repository can geocode without calling a
+hosted service. The dashboard screenshot is real aggregates from the private dataset.
 
 For a public copy of this repo, `etl/synthetic.py` writes the same schema with plausible
 distributions (invented people, addresses and incident numbers), so a reviewer can clone
 and run the whole pipeline with **zero real records**. The public copy ships that build
-and the two `*_SYNTHETIC.md` documents; `data/raw/`, `data/clean/` and the real
-`warehouse.db` stay out of the repository.
+and the two `*_SYNTHETIC.md` documents; `data/clean/`, the real `warehouse.db` and every
+other file in `data/raw/` stay out of the repository.
 
 ## Roadmap
 
 - [x] Warehouse with verified rebuild, referential checks and zero duplicate keys
 - [x] Two analysis scripts, every figure reproducible
 - [x] Streamlit dashboard: date range, station, jurisdiction and call-type filters,
-      five views, with a drill-down call-type treemap
+      six views, with a drill-down call-type treemap
 - [x] Call-type taxonomy rebuilt from NFIRS codes after the keyword classifier was found
       to be misfiling cooking fires as rescues
 - [x] Synthetic data generator, verified end to end (build, analyses and dashboard all
@@ -275,3 +354,54 @@ and the two `*_SYNTHETIC.md` documents; `data/raw/`, `data/clean/` and the real
 - [ ] Validation against ImageTrend's own canned reports (fractile response times,
       average time on scene) to prove definition parity
 - [ ] One Tableau Public viz for the portfolio
+
+## Contributing
+
+Issues and pull requests are welcome. The one hard rule is that no real department record
+enters the repository. `data/raw/` is ignored for exactly that reason (the two OpenStreetMap
+extracts are the only committed files there), so build against the synthetic dataset.
+
+### Clone the repo
+
+```bash
+git clone https://github.com/jrbowlder/sunvalleyfiredata.git
+cd sunvalleyfiredata
+
+uv venv .venv
+uv pip install -r requirements.txt
+```
+
+### Build and run the synthetic copy
+
+```bash
+python3 etl/synthetic.py
+```
+
+Then apply the `SVFD_*` exports from [Quick Start](#quick-start) and run:
+
+```bash
+python3 etl/build.py
+python3 analysis/01_demand_performance.py
+python3 analysis/02_demand_vs_coverage.py
+.venv/bin/streamlit run app/app.py
+```
+
+### Check your change
+
+There is no test suite yet; the pipeline is its own check, and these are the things worth
+looking at:
+
+- `etl/build.py` prints a row count per loader, so a source that silently contributes
+  nothing is visible immediately.
+- Both analysis scripts should still reproduce `docs/FINDINGS_SYNTHETIC.md`. A number that
+  moves is either a real change or a broken definition, and the write-up is how you tell.
+- The dashboard should render all six tabs without an exception, against the synthetic
+  warehouse.
+
+### Submit a pull request
+
+Fork the repository, make the change on a branch, and open a pull request against `main`.
+If a change touches a table, a column or a metric definition, update
+`docs/SCHEMA_SYNTHETIC.md` and `docs/FINDINGS_SYNTHETIC.md` in the same pull request. The
+docs are the specification, and letting them drift is the failure mode this project exists
+to avoid.
